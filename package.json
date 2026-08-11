@@ -1,16 +1,15 @@
 {
   "name": "lymixbot-v1",
   "version": "1.0.0",
-  "description": "Lymix Discord Set & Log Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": "22.x"
   },
   "dependencies": {
-    "discord.js": "^14.26.4",
-    "pg": "^8.16.3"
+    "discord.js": "^14.16.3",
+    "pg": "^8.13.1"
   }
 }
