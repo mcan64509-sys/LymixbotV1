@@ -489,6 +489,22 @@ async function createTables() {
     );
   `);
 
+  // Eski bot sürümünden kalan "logs" tablosunu yeni şemaya yükselt.
+  // CREATE TABLE IF NOT EXISTS mevcut tabloya yeni kolon eklemez;
+  // bu yüzden Railway/Postgres'te güvenli migration yapıyoruz.
+  await pool.query(`
+    ALTER TABLE logs
+      ADD COLUMN IF NOT EXISTS voice_channel_name TEXT,
+      ADD COLUMN IF NOT EXISTS reverted_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS reverted_by TEXT,
+      ADD COLUMN IF NOT EXISTS reverted_by_name TEXT;
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_logs_guild_log_code
+      ON logs (guild_id, log_code);
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS log_members (
       id BIGSERIAL PRIMARY KEY,
