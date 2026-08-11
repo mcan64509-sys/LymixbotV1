@@ -20,6 +20,12 @@ const DATABASE_URL = process.env.DATABASE_URL;
 
 if (!TOKEN || !CLIENT_ID || !GUILD_ID || !DATABASE_URL) {
   console.error("❌ Eksik environment variable!");
+  console.error({
+    TOKEN: !!TOKEN,
+    CLIENT_ID: !!CLIENT_ID,
+    GUILD_ID: !!GUILD_ID,
+    DATABASE_URL: !!DATABASE_URL
+  });
   process.exit(1);
 }
 
