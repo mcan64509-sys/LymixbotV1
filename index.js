@@ -33,6 +33,7 @@ const ENV = {
   F9_LOG_CHANNEL_ID: process.env.F9_LOG_CHANNEL_ID,
 
   WELCOME_LOG_CHANNEL_ID: process.env.WELCOME_LOG_CHANNEL_ID,
+  BOSS_BILDIRIM_CHANNEL_ID: process.env.BOSS_BILDIRIM_CHANNEL_ID,
   YETKILI_ROLE_ID: process.env.YETKILI_ROLE_ID || null,
 };
 
@@ -48,6 +49,7 @@ const REQUIRED_ENV = [
   "F9_VOICE_CHANNEL_ID",
   "F9_LOG_CHANNEL_ID",
   "WELCOME_LOG_CHANNEL_ID",
+  "BOSS_BILDIRIM_CHANNEL_ID",
 ];
 
 const missingEnv = REQUIRED_ENV.filter((key) => !ENV[key]);
@@ -64,6 +66,22 @@ if (missingEnv.length) {
 const BOT_FOOTER = "Nemesis Bot • Created By Lymix";
 const DUPLICATE_WARNING_SECONDS = 20;
 const CONFIRM_TIMEOUT_MS = 30_000;
+
+const BOSS_TIMEZONE = "Europe/Amsterdam";
+
+const BOSS_SCHEDULES = {
+  general: [
+    "12:12", "13:42", "15:12", "16:42",
+    "18:10", "19:40", "21:10", "22:40",
+    "00:10", "01:40", "03:10", "04:40",
+    "06:10", "07:40", "09:10", "10:40",
+  ],
+  f9: [
+    "12:40", "14:40", "16:40", "18:40",
+    "20:40", "22:40", "00:40", "02:40",
+    "04:40", "06:40", "08:40", "10:40",
+  ],
+};
 
 const TYPES = {
   general: {
@@ -435,7 +453,7 @@ async function awaitConfirmation(interaction, embed, confirmLabel = "Onayla") {
   }
 }
 
-// ======================================================
+// ======================================================\n// BOSS BİLDİRİM SİSTEMİ\n// ======================================================\n\nfunction getAmsterdamParts(date = new Date()) {\n  const formatter = new Intl.DateTimeFormat("en-CA", {\n    timeZone: BOSS_TIMEZONE,\n    year: "numeric",\n    month: "2-digit",\n    day: "2-digit",\n    hour: "2-digit",\n    minute: "2-digit",\n    hour12: false,\n  });\n\n  const parts = Object.fromEntries(\n    formatter.formatToParts(date)\n      .filter((p) => p.type !== "literal")\n      .map((p) => [p.type, p.value])\n  );\n\n  return {\n    date: `${parts.year}-${parts.month}-${parts.day}`,\n    time: `${parts.hour}:${parts.minute}`,\n  };\n}\n\nfunction subtractMinutesFromHHMM(hhmm, minutes) {\n  const [hour, minute] = hhmm.split(":").map(Number);\n  let total = hour * 60 + minute - minutes;\n  total = ((total % 1440) + 1440) % 1440;\n\n  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(\n    total % 60\n  ).padStart(2, "0")}`;\n}\n\nfunction bossDateForReminder(localDate, bossTime, reminderTime) {\n  const [bh, bm] = bossTime.split(":").map(Number);\n  const [rh, rm] = reminderTime.split(":").map(Number);\n  const bossMinutes = bh * 60 + bm;\n  const reminderMinutes = rh * 60 + rm;\n  if (reminderMinutes <= bossMinutes) return localDate;\n\n  const [y, m, d] = localDate.split("-").map(Number);\n  const utc = new Date(Date.UTC(y, m - 1, d));\n  utc.setUTCDate(utc.getUTCDate() + 1);\n  return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2, "0")}-${String(utc.getUTCDate()).padStart(2, "0")}`;\n}\n\nasync function checkBossNotifications() {\n  try {\n    if (!client.isReady()) return;\n\n    const guild = client.guilds.cache.get(ENV.GUILD_ID);\n    if (!guild) return;\n\n    const channel = await fetchChannel(guild, ENV.BOSS_BILDIRIM_CHANNEL_ID);\n    if (!channel || !channel.isTextBased()) return;\n\n    const now = getAmsterdamParts();\n\n    for (const [type, bossTimes] of Object.entries(BOSS_SCHEDULES)) {\n      const config = TYPES[type];\n      if (!config) continue;\n\n      for (const bossTime of bossTimes) {\n        const reminderTime = subtractMinutesFromHHMM(bossTime, 10);\n        if (now.time !== reminderTime) continue;\n\n        const bossDate = bossDateForReminder(now.date, bossTime, reminderTime);\n\n        const inserted = await pool.query(\n          `\n            INSERT INTO boss_notifications (guild_id, boss_type, boss_date, boss_time)\n            VALUES ($1, $2, $3, $4)\n            ON CONFLICT (guild_id, boss_type, boss_date, boss_time)\n            DO NOTHING\n            RETURNING id\n          `,\n          [guild.id, type, bossDate, bossTime]\n        );\n\n        if (!inserted.rows.length) continue;\n\n        const embed = withFooter(\n          new EmbedBuilder()\n            .setColor(config.color)\n            .setTitle(`${config.emoji} ${config.name} BOSS BİLDİRİMİ`)\n            .setDescription(\n              [\n                `⏰ **${config.name} bossuna 10 dakika kaldı!**`,\n                `🕒 **Boss Saati:** ${bossTime}`,\n              ].join("\\n")\n            )\n        );\n\n        try {\n          await channel.send({\n            content: "@everyone **Kalkın La Yatıklar** 😂",\n            embeds: [embed],\n            allowedMentions: { parse: ["everyone"] },\n          });\n\n          console.log(`✅ Boss bildirimi: ${config.name} ${bossDate} ${bossTime}`);\n        } catch (sendError) {\n          await pool.query(\n            `\n              DELETE FROM boss_notifications\n              WHERE guild_id = $1 AND boss_type = $2 AND boss_date = $3 AND boss_time = $4\n            `,\n            [guild.id, type, bossDate, bossTime]\n          );\n          throw sendError;\n        }\n      }\n    }\n  } catch (error) {\n    console.error("❌ Boss bildirim hatası:", error);\n  }\n}\n\n// ======================================================
 // DATABASE ŞEMASI
 // ======================================================
 
@@ -489,22 +507,6 @@ async function createTables() {
     );
   `);
 
-  // Eski bot sürümünden kalan "logs" tablosunu yeni şemaya yükselt.
-  // CREATE TABLE IF NOT EXISTS mevcut tabloya yeni kolon eklemez;
-  // bu yüzden Railway/Postgres'te güvenli migration yapıyoruz.
-  await pool.query(`
-    ALTER TABLE logs
-      ADD COLUMN IF NOT EXISTS voice_channel_name TEXT,
-      ADD COLUMN IF NOT EXISTS reverted_at TIMESTAMPTZ,
-      ADD COLUMN IF NOT EXISTS reverted_by TEXT,
-      ADD COLUMN IF NOT EXISTS reverted_by_name TEXT;
-  `);
-
-  await pool.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_logs_guild_log_code
-      ON logs (guild_id, log_code);
-  `);
-
   await pool.query(`
     CREATE TABLE IF NOT EXISTS log_members (
       id BIGSERIAL PRIMARY KEY,
@@ -556,6 +558,18 @@ async function createTables() {
       user_id TEXT NOT NULL,
       username TEXT NOT NULL,
       set_count INTEGER NOT NULL DEFAULT 0
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS boss_notifications (
+      id BIGSERIAL PRIMARY KEY,
+      guild_id TEXT NOT NULL,
+      boss_type TEXT NOT NULL,
+      boss_date TEXT NOT NULL,
+      boss_time TEXT NOT NULL,
+      sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (guild_id, boss_type, boss_date, boss_time)
     );
   `);
 
@@ -2230,7 +2244,11 @@ client.once("ready", () => {
   console.log(`🤖 Nemesis Bot aktif: ${client.user.tag}`);
   console.log("🐘 PostgreSQL: ONLINE");
   console.log("🚂 Railway: ONLINE");
+  console.log("⏰ Boss bildirim sistemi: ONLINE (Europe/Amsterdam)");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+  checkBossNotifications();
+  setInterval(checkBossNotifications, 30_000);
 });
 
 async function start() {
