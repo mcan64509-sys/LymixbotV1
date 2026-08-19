@@ -552,7 +552,7 @@ async function checkBossNotifications() {
 
         try {
           await channel.send({
-            content: "@everyone **Kalkın La Yatıklar** 😂",
+            content: "@everyone **Kalkın La Yatıklar Boss Saati** 😂",
             embeds: [embed],
             allowedMentions: { parse: ["everyone"] },
           });
