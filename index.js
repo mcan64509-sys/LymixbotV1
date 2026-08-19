@@ -67,7 +67,7 @@ const BOT_FOOTER = "Nemesis Bot • Created By Lymix";
 const DUPLICATE_WARNING_SECONDS = 20;
 const CONFIRM_TIMEOUT_MS = 30_000;
 
-const BOSS_TIMEZONE = "Europe/Amsterdam";
+const BOSS_TIMEZONE = "Europe/Istanbul";
 
 const BOSS_SCHEDULES = {
   general: [
@@ -727,6 +727,10 @@ const commands = [
     ),
 
   new SlashCommandBuilder()
+    .setName("gerisayim")
+    .setDescription("Sıradaki General ve F9 bosslarına kalan süreyi gösterir."),
+
+  new SlashCommandBuilder()
     .setName("gecmis")
     .setDescription("Eski pay dağıtım dönemlerini gösterir.")
     .addStringOption((o) =>
@@ -962,6 +966,57 @@ async function archiveAndResetType(db, interaction, type) {
     totalLogs,
     users: usersResult.rows,
   };
+}
+
+// ======================================================
+// BOSS GERİ SAYIM
+// ======================================================
+
+function getNextBossCountdown(type, date = new Date()) {
+  const schedule = BOSS_SCHEDULES[type];
+  if (!schedule?.length) return null;
+
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone: BOSS_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+
+  const parts = Object.fromEntries(
+    formatter.formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, Number(part.value)])
+  );
+
+  const nowSeconds = parts.hour * 3600 + parts.minute * 60 + parts.second;
+  let next = null;
+
+  for (const bossTime of schedule) {
+    const [hour, minute] = bossTime.split(":").map(Number);
+    const bossSeconds = hour * 3600 + minute * 60;
+    let remaining = bossSeconds - nowSeconds;
+
+    if (remaining < 0) remaining += 24 * 3600;
+
+    if (!next || remaining < next.seconds) {
+      next = { bossTime, seconds: remaining };
+    }
+  }
+
+  return next;
+}
+
+function formatBossCountdown(totalSeconds) {
+  const seconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+
+  if (hours > 0) return `${hours} saat ${minutes} dakika ${secs} saniye`;
+  if (minutes > 0) return `${minutes} dakika ${secs} saniye`;
+  return `${secs} saniye`;
 }
 
 // ======================================================
@@ -2084,6 +2139,41 @@ client.on("interactionCreate", async (interaction) => {
         db.release();
       }
     }
+    // --------------------------------------------------
+    // /GERISAYIM
+    // --------------------------------------------------
+    if (interaction.commandName === "gerisayim") {
+      await interaction.deferReply();
+
+      const general = getNextBossCountdown("general");
+      const f9 = getNextBossCountdown("f9");
+
+      const embed = withFooter(
+        new EmbedBuilder()
+          .setColor(0x5865f2)
+          .setTitle("⏳ NEMESİS BOSS GERİ SAYIM")
+          .addFields(
+            {
+              name: "🛡️ GENERAL",
+              value:
+                `⏰ Sıradaki Boss: **${general.bossTime}**\n` +
+                `⌛ Kalan: **${formatBossCountdown(general.seconds)}**`,
+              inline: false,
+            },
+            {
+              name: "🕷️ F9",
+              value:
+                `⏰ Sıradaki Boss: **${f9.bossTime}**\n` +
+                `⌛ Kalan: **${formatBossCountdown(f9.seconds)}**`,
+              inline: false,
+            }
+          )
+      );
+
+      return interaction.editReply({ embeds: [embed] });
+    }
+
+
 
     // --------------------------------------------------
     // /GECMIS
