@@ -453,7 +453,129 @@ async function awaitConfirmation(interaction, embed, confirmLabel = "Onayla") {
   }
 }
 
-// ======================================================\n// BOSS BİLDİRİM SİSTEMİ\n// ======================================================\n\nfunction getAmsterdamParts(date = new Date()) {\n  const formatter = new Intl.DateTimeFormat("en-CA", {\n    timeZone: BOSS_TIMEZONE,\n    year: "numeric",\n    month: "2-digit",\n    day: "2-digit",\n    hour: "2-digit",\n    minute: "2-digit",\n    hour12: false,\n  });\n\n  const parts = Object.fromEntries(\n    formatter.formatToParts(date)\n      .filter((p) => p.type !== "literal")\n      .map((p) => [p.type, p.value])\n  );\n\n  return {\n    date: `${parts.year}-${parts.month}-${parts.day}`,\n    time: `${parts.hour}:${parts.minute}`,\n  };\n}\n\nfunction subtractMinutesFromHHMM(hhmm, minutes) {\n  const [hour, minute] = hhmm.split(":").map(Number);\n  let total = hour * 60 + minute - minutes;\n  total = ((total % 1440) + 1440) % 1440;\n\n  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(\n    total % 60\n  ).padStart(2, "0")}`;\n}\n\nfunction bossDateForReminder(localDate, bossTime, reminderTime) {\n  const [bh, bm] = bossTime.split(":").map(Number);\n  const [rh, rm] = reminderTime.split(":").map(Number);\n  const bossMinutes = bh * 60 + bm;\n  const reminderMinutes = rh * 60 + rm;\n  if (reminderMinutes <= bossMinutes) return localDate;\n\n  const [y, m, d] = localDate.split("-").map(Number);\n  const utc = new Date(Date.UTC(y, m - 1, d));\n  utc.setUTCDate(utc.getUTCDate() + 1);\n  return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2, "0")}-${String(utc.getUTCDate()).padStart(2, "0")}`;\n}\n\nasync function checkBossNotifications() {\n  try {\n    if (!client.isReady()) return;\n\n    const guild = client.guilds.cache.get(ENV.GUILD_ID);\n    if (!guild) return;\n\n    const channel = await fetchChannel(guild, ENV.BOSS_BILDIRIM_CHANNEL_ID);\n    if (!channel || !channel.isTextBased()) return;\n\n    const now = getAmsterdamParts();\n\n    for (const [type, bossTimes] of Object.entries(BOSS_SCHEDULES)) {\n      const config = TYPES[type];\n      if (!config) continue;\n\n      for (const bossTime of bossTimes) {\n        const reminderTime = subtractMinutesFromHHMM(bossTime, 10);\n        if (now.time !== reminderTime) continue;\n\n        const bossDate = bossDateForReminder(now.date, bossTime, reminderTime);\n\n        const inserted = await pool.query(\n          `\n            INSERT INTO boss_notifications (guild_id, boss_type, boss_date, boss_time)\n            VALUES ($1, $2, $3, $4)\n            ON CONFLICT (guild_id, boss_type, boss_date, boss_time)\n            DO NOTHING\n            RETURNING id\n          `,\n          [guild.id, type, bossDate, bossTime]\n        );\n\n        if (!inserted.rows.length) continue;\n\n        const embed = withFooter(\n          new EmbedBuilder()\n            .setColor(config.color)\n            .setTitle(`${config.emoji} ${config.name} BOSS BİLDİRİMİ`)\n            .setDescription(\n              [\n                `⏰ **${config.name} bossuna 10 dakika kaldı!**`,\n                `🕒 **Boss Saati:** ${bossTime}`,\n              ].join("\\n")\n            )\n        );\n\n        try {\n          await channel.send({\n            content: "@everyone **Kalkın La Yatıklar** 😂",\n            embeds: [embed],\n            allowedMentions: { parse: ["everyone"] },\n          });\n\n          console.log(`✅ Boss bildirimi: ${config.name} ${bossDate} ${bossTime}`);\n        } catch (sendError) {\n          await pool.query(\n            `\n              DELETE FROM boss_notifications\n              WHERE guild_id = $1 AND boss_type = $2 AND boss_date = $3 AND boss_time = $4\n            `,\n            [guild.id, type, bossDate, bossTime]\n          );\n          throw sendError;\n        }\n      }\n    }\n  } catch (error) {\n    console.error("❌ Boss bildirim hatası:", error);\n  }\n}\n\n// ======================================================
+// ======================================================
+// BOSS BİLDİRİM SİSTEMİ
+// ======================================================
+
+function getIstanbulParts(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: BOSS_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  const parts = Object.fromEntries(
+    formatter.formatToParts(date)
+      .filter((p) => p.type !== "literal")
+      .map((p) => [p.type, p.value])
+  );
+
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    time: `${parts.hour}:${parts.minute}`,
+  };
+}
+
+function subtractMinutesFromHHMM(hhmm, minutes) {
+  const [hour, minute] = hhmm.split(":").map(Number);
+  let total = hour * 60 + minute - minutes;
+  total = ((total % 1440) + 1440) % 1440;
+
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(
+    total % 60
+  ).padStart(2, "0")}`;
+}
+
+function bossDateForReminder(localDate, bossTime, reminderTime) {
+  const [bh, bm] = bossTime.split(":").map(Number);
+  const [rh, rm] = reminderTime.split(":").map(Number);
+  const bossMinutes = bh * 60 + bm;
+  const reminderMinutes = rh * 60 + rm;
+  if (reminderMinutes <= bossMinutes) return localDate;
+
+  const [y, m, d] = localDate.split("-").map(Number);
+  const utc = new Date(Date.UTC(y, m - 1, d));
+  utc.setUTCDate(utc.getUTCDate() + 1);
+  return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2, "0")}-${String(utc.getUTCDate()).padStart(2, "0")}`;
+}
+
+async function checkBossNotifications() {
+  try {
+    if (!client.isReady()) return;
+
+    const guild = client.guilds.cache.get(ENV.GUILD_ID);
+    if (!guild) return;
+
+    const channel = await fetchChannel(guild, ENV.BOSS_BILDIRIM_CHANNEL_ID);
+    if (!channel || !channel.isTextBased()) return;
+
+    const now = getIstanbulParts();
+
+    for (const [type, bossTimes] of Object.entries(BOSS_SCHEDULES)) {
+      const config = TYPES[type];
+      if (!config) continue;
+
+      for (const bossTime of bossTimes) {
+        const reminderTime = subtractMinutesFromHHMM(bossTime, 10);
+        if (now.time !== reminderTime) continue;
+
+        const bossDate = bossDateForReminder(now.date, bossTime, reminderTime);
+
+        const inserted = await pool.query(
+          `
+            INSERT INTO boss_notifications (guild_id, boss_type, boss_date, boss_time)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (guild_id, boss_type, boss_date, boss_time)
+            DO NOTHING
+            RETURNING id
+          `,
+          [guild.id, type, bossDate, bossTime]
+        );
+
+        if (!inserted.rows.length) continue;
+
+        const embed = withFooter(
+          new EmbedBuilder()
+            .setColor(config.color)
+            .setTitle(`${config.emoji} ${config.name} BOSS BİLDİRİMİ`)
+            .setDescription(
+              [
+                `⏰ **${config.name} bossuna 10 dakika kaldı!**`,
+                `🕒 **Boss Saati:** ${bossTime}`,
+              ].join("\\n")
+            )
+        );
+
+        try {
+          await channel.send({
+            content: "@everyone **Kalkın La Yatıklar** 😂",
+            embeds: [embed],
+            allowedMentions: { parse: ["everyone"] },
+          });
+
+          console.log(`✅ Boss bildirimi: ${config.name} ${bossDate} ${bossTime}`);
+        } catch (sendError) {
+          await pool.query(
+            `
+              DELETE FROM boss_notifications
+              WHERE guild_id = $1 AND boss_type = $2 AND boss_date = $3 AND boss_time = $4
+            `,
+            [guild.id, type, bossDate, bossTime]
+          );
+          throw sendError;
+        }
+      }
+    }
+  } catch (error) {
+    console.error("❌ Boss bildirim hatası:", error);
+  }
+}
+
+// ======================================================
 // DATABASE ŞEMASI
 // ======================================================
 
@@ -2334,7 +2456,7 @@ client.once("ready", () => {
   console.log(`🤖 Nemesis Bot aktif: ${client.user.tag}`);
   console.log("🐘 PostgreSQL: ONLINE");
   console.log("🚂 Railway: ONLINE");
-  console.log("⏰ Boss bildirim sistemi: ONLINE (Europe/Amsterdam)");
+  console.log("⏰ Boss bildirim sistemi: ONLINE (Europe/Istanbul)");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
   checkBossNotifications();
