@@ -15,7 +15,11 @@ const {
 const { Pool } = require("pg");
 const { Player } = require("discord-player");
 const { DefaultExtractors } = require("@discord-player/extractor");
-const { YouTubeDlpExtractor } = require("discord-player-youtubedlp");
+const {
+  YouTubeDlpExtractor,
+  setFFmpegPath,
+  setYtDlpPath,
+} = require("discord-player-youtubedlp");
 
 // ======================================================
 // ENV
@@ -156,6 +160,26 @@ pool.on("error", (error) => {
 
 const musicPlayer = new Player(client, {
   skipFFmpeg: false,
+});
+
+setFFmpegPath("/usr/bin/ffmpeg");
+setYtDlpPath("/usr/bin/yt-dlp");
+
+musicPlayer.events.on("error", (queue, error) => {
+  console.error("❌ MÜZİK QUEUE ERROR:", {
+    guildId: queue?.guild?.id || null,
+    message: error?.message || String(error),
+    stack: error?.stack || null,
+  });
+});
+
+musicPlayer.events.on("playerError", (queue, error, track) => {
+  console.error("❌ MÜZİK PLAYER ERROR:", {
+    guildId: queue?.guild?.id || null,
+    track: track?.title || track?.url || null,
+    message: error?.message || String(error),
+    stack: error?.stack || null,
+  });
 });
 
 
@@ -1406,6 +1430,13 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       try {
+        console.log("🎵 /çal isteği:", {
+          user: interaction.user.tag,
+          guildId: interaction.guild.id,
+          voiceChannelId: voiceChannel.id,
+          query,
+        });
+
         const result = await musicPlayer.play(voiceChannel, query, {
           requestedBy: interaction.user,
           nodeOptions: {
@@ -1422,6 +1453,13 @@ client.on("interactionCreate", async (interaction) => {
         });
 
         const track = result.track;
+
+        console.log("✅ /çal sonucu:", {
+          title: track?.title || null,
+          url: track?.url || null,
+          duration: track?.duration || null,
+          source: track?.source || null,
+        });
 
         return interaction.editReply({
           embeds: [
