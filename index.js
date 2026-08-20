@@ -13,6 +13,7 @@ const {
 } = require("discord.js");
 
 const { Pool } = require("pg");
+const { spawn } = require("node:child_process");
 const { Player } = require("discord-player");
 const { DefaultExtractors } = require("@discord-player/extractor");
 const {
@@ -1206,6 +1207,52 @@ function formatBossCountdown(totalSeconds) {
 }
 
 // ======================================================
+// YOUTUBE DOĞRUDAN SES AKIŞI
+// ======================================================
+
+function createYtDlpAudioStream(url) {
+  const args = [
+    "--no-playlist",
+    "--no-warnings",
+    "--quiet",
+    "-f",
+    "bestaudio/best",
+    "-o",
+    "-",
+    url,
+  ];
+
+  console.log("▶️ yt-dlp stream başlatılıyor:", url);
+
+  const proc = spawn("/usr/bin/yt-dlp", args, {
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  let stderr = "";
+
+  proc.stderr.on("data", (chunk) => {
+    stderr += chunk.toString();
+    if (stderr.length > 4000) {
+      stderr = stderr.slice(-4000);
+    }
+  });
+
+  proc.on("error", (error) => {
+    console.error("❌ yt-dlp process error:", error);
+  });
+
+  proc.on("close", (code) => {
+    if (code !== 0) {
+      console.error("❌ yt-dlp çıkış kodu:", code, stderr || "(stderr yok)");
+    } else {
+      console.log("✅ yt-dlp stream kapandı.");
+    }
+  });
+
+  return proc.stdout;
+}
+
+// ======================================================
 // EĞLENCE KOMUTLARI YARDIMCILARI
 // ======================================================
 
@@ -1444,6 +1491,22 @@ client.on("interactionCreate", async (interaction) => {
               channelId: interaction.channelId,
               requestedById: interaction.user.id,
             },
+
+            // YouTube extractor sadece metadata bulsa bile sesi doğrudan
+            // sistemde kurulu yt-dlp üzerinden çekiyoruz.
+            onBeforeCreateStream: async (track) => {
+              const url = track?.url || query;
+
+              if (
+                typeof url === "string" &&
+                (url.includes("youtube.com/") || url.includes("youtu.be/"))
+              ) {
+                return createYtDlpAudioStream(url);
+              }
+
+              return null;
+            },
+
             leaveOnEmpty: true,
             leaveOnEmptyCooldown: 60_000,
             leaveOnEnd: true,
@@ -1469,7 +1532,7 @@ client.on("interactionCreate", async (interaction) => {
                 .setTitle("🎵 MÜZİĞE EKLENDİ")
                 .setDescription(
                   `🎶 **${track.title}**\n` +
-                  `⏱️ Süre: **${track.duration || "Bilinmiyor"}**\n` +
+                  `⏱️ Süre: **${track.duration && track.duration !== "0:00" ? track.duration : "Canlı/hesaplanıyor"}**\n` +
                   `👤 İsteyen: ${interaction.user}`
                 )
                 .setThumbnail(track.thumbnail || null)
