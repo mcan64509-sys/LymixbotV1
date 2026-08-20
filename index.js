@@ -13,6 +13,7 @@ const {
 
 const { Pool } = require("pg");
 const { Player } = require("discord-player");
+const { DefaultExtractors } = require("@discord-player/extractor");
 
 // ======================================================
 // ENV
@@ -2839,7 +2840,7 @@ async function start() {
 
     await createTables();
 
-    await musicPlayer.extractors.loadDefault();
+    await musicPlayer.extractors.loadMulti(DefaultExtractors);
     console.log("🎵 Müzik kaynakları hazır.");
 
     await client.login(ENV.TOKEN);
