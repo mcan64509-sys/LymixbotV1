@@ -1244,9 +1244,19 @@ function createYtDlpAudioStream(url) {
     "--no-playlist",
     "--no-warnings",
     "--quiet",
+
+    // YouTube 2026 JS challenge çözümü:
+    "--js-runtimes",
+    "node",
+    "--remote-components",
+    "ejs:github",
+
     ...(cookieFile ? ["--cookies", cookieFile] : []),
+
+    // Önce klasik HTTP audio formatlarını dene, sonra genel fallback.
     "-f",
-    "bestaudio/best",
+    "bestaudio[protocol^=http]/bestaudio/best",
+
     "-o",
     "-",
     url,
@@ -1254,7 +1264,7 @@ function createYtDlpAudioStream(url) {
 
   console.log("▶️ yt-dlp stream başlatılıyor:", url);
 
-  const proc = spawn("/usr/bin/yt-dlp", args, {
+  const proc = spawn("yt-dlp", args, {
     stdio: ["ignore", "pipe", "pipe"],
   });
 
