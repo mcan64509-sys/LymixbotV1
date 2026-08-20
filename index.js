@@ -12,6 +12,7 @@ const {
 } = require("discord.js");
 
 const { Pool } = require("pg");
+const { Player } = require("discord-player");
 
 // ======================================================
 // ENV
@@ -149,6 +150,9 @@ const pool = new Pool({
 pool.on("error", (error) => {
   console.error("❌ PostgreSQL Pool Error:", error);
 });
+
+const musicPlayer = new Player(client);
+
 
 // ======================================================
 // YARDIMCI FONKSİYONLAR
@@ -857,6 +861,29 @@ const commands = [
     .setDescription("Rastgele meme gönderir."),
 
   new SlashCommandBuilder()
+    .setName("çal")
+    .setDescription("Bulunduğun ses kanalında müzik çalar.")
+    .addStringOption((o) =>
+      o.setName("şarkı").setDescription("Şarkı adı veya bağlantısı").setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("geç")
+    .setDescription("Çalan şarkıyı geçer."),
+
+  new SlashCommandBuilder()
+    .setName("durdur")
+    .setDescription("Müziği durdurur ve kuyruğu temizler."),
+
+  new SlashCommandBuilder()
+    .setName("kuyruk")
+    .setDescription("Müzik kuyruğunu gösterir."),
+
+  new SlashCommandBuilder()
+    .setName("şimdiçalıyor")
+    .setDescription("Şu anda çalan şarkıyı gösterir."),
+
+  new SlashCommandBuilder()
     .setName("gerisayim")
     .setDescription("Sıradaki General ve F9 bosslarına kalan süreyi gösterir."),
 
@@ -1316,6 +1343,177 @@ client.on("interactionCreate", async (interaction) => {
           ],
         });
       }
+    }
+
+    // --------------------------------------------------
+    // MÜZİK: /ÇAL /GEÇ /DURDUR /KUYRUK /ŞİMDİÇALIYOR
+    // --------------------------------------------------
+    if (interaction.commandName === "çal") {
+      const member = interaction.member;
+      const voiceChannel = member?.voice?.channel;
+
+      if (!voiceChannel) {
+        return interaction.reply({
+          embeds: [feedbackEmbed("🎵 SES KANALI GEREKLİ", "Önce bir ses kanalına gir knk 😄")],
+          ephemeral: true,
+        });
+      }
+
+      await interaction.deferReply();
+      const query = interaction.options.getString("şarkı");
+
+      try {
+        const result = await musicPlayer.play(voiceChannel, query, {
+          requestedBy: interaction.user,
+          nodeOptions: {
+            metadata: {
+              channelId: interaction.channelId,
+              requestedById: interaction.user.id,
+            },
+            leaveOnEmpty: true,
+            leaveOnEmptyCooldown: 60_000,
+            leaveOnEnd: true,
+            leaveOnEndCooldown: 60_000,
+            leaveOnStop: true,
+          },
+        });
+
+        const track = result.track;
+
+        return interaction.editReply({
+          embeds: [
+            withFooter(
+              new EmbedBuilder()
+                .setColor(0x57f287)
+                .setTitle("🎵 MÜZİĞE EKLENDİ")
+                .setDescription(
+                  `🎶 **${track.title}**\n` +
+                  `⏱️ Süre: **${track.duration || "Bilinmiyor"}**\n` +
+                  `👤 İsteyen: ${interaction.user}`
+                )
+                .setThumbnail(track.thumbnail || null)
+            ),
+          ],
+        });
+      } catch (error) {
+        console.error("❌ /çal:", error);
+        return interaction.editReply({
+          embeds: [
+            feedbackEmbed(
+              "❌ ŞARKI AÇILAMADI",
+              "Şarkı bulunamadı veya müzik kaynağına ulaşılamadı. Başka bir isim/link dene."
+            ),
+          ],
+        });
+      }
+    }
+
+    if (interaction.commandName === "geç") {
+      const queue = musicPlayer.nodes.get(interaction.guild.id);
+
+      if (!queue?.currentTrack) {
+        return interaction.reply({
+          embeds: [feedbackEmbed("🎵 MÜZİK YOK", "Şu anda çalan bir şarkı yok.", 0xfee75c)],
+          ephemeral: true,
+        });
+      }
+
+      const skipped = queue.currentTrack;
+      queue.node.skip();
+
+      return interaction.reply({
+        embeds: [
+          withFooter(
+            new EmbedBuilder()
+              .setColor(0xfee75c)
+              .setTitle("⏭️ ŞARKI GEÇİLDİ")
+              .setDescription(`**${skipped.title}**`)
+          ),
+        ],
+      });
+    }
+
+    if (interaction.commandName === "durdur") {
+      const queue = musicPlayer.nodes.get(interaction.guild.id);
+
+      if (!queue) {
+        return interaction.reply({
+          embeds: [feedbackEmbed("🎵 MÜZİK YOK", "Aktif bir müzik kuyruğu yok.", 0xfee75c)],
+          ephemeral: true,
+        });
+      }
+
+      queue.delete();
+
+      return interaction.reply({
+        embeds: [
+          withFooter(
+            new EmbedBuilder()
+              .setColor(0xed4245)
+              .setTitle("⏹️ MÜZİK DURDURULDU")
+              .setDescription("Kuyruk temizlendi ve bot ses kanalından ayrıldı.")
+          ),
+        ],
+      });
+    }
+
+    if (interaction.commandName === "kuyruk") {
+      const queue = musicPlayer.nodes.get(interaction.guild.id);
+
+      if (!queue?.currentTrack) {
+        return interaction.reply({
+          embeds: [feedbackEmbed("📜 KUYRUK BOŞ", "Şu anda müzik kuyruğu yok.", 0xfee75c)],
+          ephemeral: true,
+        });
+      }
+
+      const upcoming = queue.tracks.toArray().slice(0, 10);
+      const lines = [
+        `▶️ **Şimdi:** ${queue.currentTrack.title}`,
+        "",
+        ...(upcoming.length
+          ? upcoming.map((track, index) => `${index + 1}. **${track.title}** • ${track.duration || "?"}`)
+          : ["📭 Sırada başka şarkı yok."]),
+      ];
+
+      return interaction.reply({
+        embeds: [
+          withFooter(
+            new EmbedBuilder()
+              .setColor(0x5865f2)
+              .setTitle("📜 NEMESİS MÜZİK KUYRUĞU")
+              .setDescription(lines.join("\\n"))
+          ),
+        ],
+      });
+    }
+
+    if (interaction.commandName === "şimdiçalıyor") {
+      const queue = musicPlayer.nodes.get(interaction.guild.id);
+      const track = queue?.currentTrack;
+
+      if (!track) {
+        return interaction.reply({
+          embeds: [feedbackEmbed("🎵 MÜZİK YOK", "Şu anda çalan bir şarkı yok.", 0xfee75c)],
+          ephemeral: true,
+        });
+      }
+
+      return interaction.reply({
+        embeds: [
+          withFooter(
+            new EmbedBuilder()
+              .setColor(0x5865f2)
+              .setTitle("🎶 ŞİMDİ ÇALIYOR")
+              .setDescription(
+                `**${track.title}**\n` +
+                `⏱️ Süre: **${track.duration || "Bilinmiyor"}**\n` +
+                (track.requestedBy ? `👤 İsteyen: ${track.requestedBy}` : "")
+              )
+              .setThumbnail(track.thumbnail || null)
+          ),
+        ],
+      });
     }
 
     // --------------------------------------------------
@@ -2641,7 +2839,18 @@ async function start() {
 
     await createTables();
     await registerCommands();
+    await async function startBot() {
+  try {
+    await musicPlayer.extractors.loadDefault();
+    console.log("🎵 Müzik kaynakları hazır.");
     await client.login(ENV.TOKEN);
+  } catch (error) {
+    console.error("❌ Bot başlatma hatası:", error);
+    process.exit(1);
+  }
+}
+
+startBot();
   } catch (error) {
     console.error("❌ BOT BAŞLATILAMADI:", error);
     process.exit(1);
