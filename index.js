@@ -552,7 +552,7 @@ async function checkBossNotifications() {
 
         try {
           await channel.send({
-            content: "@everyone **Kalkın La Yatıklar Boss Saati** 😂",
+            content: "@everyone **Kalkın La Yatıklar** 😂",
             embeds: [embed],
             allowedMentions: { parse: ["everyone"] },
           });
@@ -849,6 +849,14 @@ const commands = [
     ),
 
   new SlashCommandBuilder()
+    .setName("atatürk")
+    .setDescription("Rastgele Atatürk fotoğrafı ve sözü gönderir."),
+
+  new SlashCommandBuilder()
+    .setName("meme")
+    .setDescription("Rastgele meme gönderir."),
+
+  new SlashCommandBuilder()
     .setName("gerisayim")
     .setDescription("Sıradaki General ve F9 bosslarına kalan süreyi gösterir."),
 
@@ -1142,6 +1150,82 @@ function formatBossCountdown(totalSeconds) {
 }
 
 // ======================================================
+// EĞLENCE KOMUTLARI YARDIMCILARI
+// ======================================================
+
+const ATATURK_QUOTES = [
+  "Yurtta sulh, cihanda sulh.",
+  "Egemenlik kayıtsız şartsız milletindir.",
+  "Hayatta en hakiki mürşit ilimdir.",
+  "Ne mutlu Türküm diyene!",
+  "Bütün ümidim gençliktedir.",
+];
+
+async function getRandomAtaturkImage() {
+  const searchParams = new URLSearchParams({
+    action: "query",
+    generator: "search",
+    gsrsearch: 'Mustafa Kemal Atatürk portrait',
+    gsrnamespace: "6",
+    gsrlimit: "25",
+    prop: "imageinfo",
+    iiprop: "url",
+    iiurlwidth: "1200",
+    format: "json",
+    origin: "*",
+  });
+
+  const response = await fetch(
+    `https://commons.wikimedia.org/w/api.php?${searchParams.toString()}`,
+    {
+      headers: {
+        "User-Agent": "NemesisBot/1.0 (Discord Bot)",
+      },
+    }
+  );
+
+  if (!response.ok) throw new Error(`Wikimedia HTTP ${response.status}`);
+
+  const data = await response.json();
+  const pages = Object.values(data?.query?.pages || {}).filter((page) => {
+    const info = page?.imageinfo?.[0];
+    const url = info?.thumburl || info?.url;
+    return url && /\.(jpe?g|png|webp)(\?|$)/i.test(url);
+  });
+
+  if (!pages.length) throw new Error("Atatürk fotoğrafı bulunamadı.");
+
+  const selected = pages[Math.floor(Math.random() * pages.length)];
+  const info = selected.imageinfo[0];
+
+  return {
+    imageUrl: info.thumburl || info.url,
+    sourceUrl: info.descriptionurl || null,
+  };
+}
+
+async function getRandomMeme() {
+  const response = await fetch("https://meme-api.com/gimme/memes", {
+    headers: {
+      "User-Agent": "NemesisBot/1.0 (Discord Bot)",
+    },
+  });
+
+  if (!response.ok) throw new Error(`Meme API HTTP ${response.status}`);
+
+  const data = await response.json();
+  if (!data?.url || data?.nsfw) throw new Error("Uygun meme bulunamadı.");
+
+  return {
+    title: data.title || "Rastgele Meme",
+    imageUrl: data.url,
+    postUrl: data.postLink || null,
+    subreddit: data.subreddit || "memes",
+    author: data.author || null,
+  };
+}
+
+// ======================================================
 // INTERACTION HANDLER
 // ======================================================
 
@@ -1149,6 +1233,91 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   try {
+    // --------------------------------------------------
+    // /ATATÜRK
+    // --------------------------------------------------
+    if (interaction.commandName === "atatürk") {
+      await interaction.deferReply();
+
+      try {
+        const photo = await getRandomAtaturkImage();
+        const quote = ATATURK_QUOTES[Math.floor(Math.random() * ATATURK_QUOTES.length)];
+
+        const embed = withFooter(
+          new EmbedBuilder()
+            .setColor(0xe30a17)
+            .setTitle("🇹🇷 MUSTAFA KEMAL ATATÜRK")
+            .setDescription(`💬 **“${quote}”**`)
+            .setImage(photo.imageUrl)
+        );
+
+        if (photo.sourceUrl) {
+          embed.addFields({
+            name: "🖼️ Fotoğraf Kaynağı",
+            value: `[Wikimedia Commons](${photo.sourceUrl})`,
+          });
+        }
+
+        return interaction.editReply({ embeds: [embed] });
+      } catch (error) {
+        console.error("❌ /atatürk:", error);
+        const quote = ATATURK_QUOTES[Math.floor(Math.random() * ATATURK_QUOTES.length)];
+
+        return interaction.editReply({
+          embeds: [
+            withFooter(
+              new EmbedBuilder()
+                .setColor(0xe30a17)
+                .setTitle("🇹🇷 MUSTAFA KEMAL ATATÜRK")
+                .setDescription(`💬 **“${quote}”**\n\n⚠️ Fotoğraf kaynağına şu an ulaşılamadı.`)
+            ),
+          ],
+        });
+      }
+    }
+
+    // --------------------------------------------------
+    // /MEME
+    // --------------------------------------------------
+    if (interaction.commandName === "meme") {
+      await interaction.deferReply();
+
+      try {
+        const meme = await getRandomMeme();
+
+        const embed = withFooter(
+          new EmbedBuilder()
+            .setColor(0xfee75c)
+            .setTitle(`😂 ${meme.title}`)
+            .setImage(meme.imageUrl)
+        );
+
+        const info = [`📌 r/${meme.subreddit}`];
+        if (meme.author) info.push(`👤 u/${meme.author}`);
+        embed.setDescription(info.join(" • "));
+
+        if (meme.postUrl) {
+          embed.addFields({
+            name: "🔗 Gönderi",
+            value: `[Orijinal paylaşımı aç](${meme.postUrl})`,
+          });
+        }
+
+        return interaction.editReply({ embeds: [embed] });
+      } catch (error) {
+        console.error("❌ /meme:", error);
+        return interaction.editReply({
+          embeds: [
+            feedbackEmbed(
+              "😂 MEME BULUNAMADI",
+              "Meme servisine şu an ulaşılamıyor. Biraz sonra tekrar dene.",
+              0xfee75c
+            ),
+          ],
+        });
+      }
+    }
+
     // --------------------------------------------------
     // /LOG
     // --------------------------------------------------
