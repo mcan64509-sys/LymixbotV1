@@ -154,7 +154,9 @@ pool.on("error", (error) => {
   console.error("❌ PostgreSQL Pool Error:", error);
 });
 
-const musicPlayer = new Player(client);
+const musicPlayer = new Player(client, {
+  skipFFmpeg: false,
+});
 
 
 // ======================================================
@@ -2883,7 +2885,7 @@ async function start() {
     await musicPlayer.extractors.loadMulti(DefaultExtractors);
 
     await musicPlayer.extractors.register(YouTubeDlpExtractor, {
-      debug: true,
+      debug: false,
       searchLimit: 3,
       ytdlpTimeoutMs: 30000,
     });
