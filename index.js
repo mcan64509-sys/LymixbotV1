@@ -15,7 +15,7 @@ const {
 const { Pool } = require("pg");
 const { Player } = require("discord-player");
 const { DefaultExtractors } = require("@discord-player/extractor");
-const { YoutubeiExtractor } = require("discord-player-youtubei");
+const youtubeiModule = require("discord-player-youtubei");
 
 // ======================================================
 // ENV
@@ -2881,8 +2881,29 @@ async function start() {
     await createTables();
 
     await musicPlayer.extractors.loadMulti(DefaultExtractors);
+
+    // discord-player-youtubei 3.x beta sürümlerinde CommonJS export şekli
+    // sürüme göre değişebiliyor. Class'ı güvenli şekilde çöz.
+    const YoutubeiExtractor =
+      youtubeiModule.YoutubeiExtractor ||
+      youtubeiModule.default?.YoutubeiExtractor ||
+      youtubeiModule.default ||
+      youtubeiModule;
+
+    if (
+      typeof YoutubeiExtractor !== "function" ||
+      !YoutubeiExtractor.identifier
+    ) {
+      throw new Error(
+        "YoutubeiExtractor çözülemedi. Paket exportları: " +
+          Object.keys(youtubeiModule).join(", ")
+      );
+    }
+
     await musicPlayer.extractors.register(YoutubeiExtractor, {});
-    console.log("▶️ YouTube extractor hazır.");
+    console.log(
+      `▶️ YouTube extractor hazır: ${YoutubeiExtractor.identifier}`
+    );
     console.log("🎵 Müzik kaynakları hazır.");
 
     await client.login(ENV.TOKEN);
