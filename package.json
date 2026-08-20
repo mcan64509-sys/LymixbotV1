@@ -1,7 +1,7 @@
 {
   "name": "nemesis-discord-bot",
-  "version": "3.0.0",
-  "description": "Nemesis Discord Set & Log Bot",
+  "version": "4.0.0",
+  "description": "Nemesis Discord Set, Log, Boss, Fun & Music Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -11,6 +11,10 @@
   },
   "dependencies": {
     "discord.js": "14.16.3",
-    "pg": "8.13.1"
+    "pg": "8.13.1",
+    "discord-player": "^7.1.0",
+    "@discord-player/extractor": "^7.1.0",
+    "@discordjs/voice": "^0.18.0",
+    "ffmpeg-static": "^5.2.0"
   }
 }
