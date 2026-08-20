@@ -14,6 +14,7 @@ const {
 const { Pool } = require("pg");
 const { Player } = require("discord-player");
 const { DefaultExtractors } = require("@discord-player/extractor");
+const { YoutubeiExtractor } = require("discord-player-youtubei");
 
 // ======================================================
 // ENV
@@ -2841,6 +2842,8 @@ async function start() {
     await createTables();
 
     await musicPlayer.extractors.loadMulti(DefaultExtractors);
+    await musicPlayer.extractors.register(YoutubeiExtractor, {});
+    console.log("▶️ YouTube extractor hazır.");
     console.log("🎵 Müzik kaynakları hazır.");
 
     await client.login(ENV.TOKEN);
