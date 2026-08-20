@@ -2838,12 +2838,16 @@ async function start() {
     console.log("✅ PostgreSQL bağlantısı başarılı.");
 
     await createTables();
-    await registerCommands();
 
     await musicPlayer.extractors.loadDefault();
     console.log("🎵 Müzik kaynakları hazır.");
 
     await client.login(ENV.TOKEN);
+
+    // Slash komut kaydı Discord bağlantısını bloklamasın.
+    registerCommands().catch((error) => {
+      console.error("❌ Slash komutları yüklenemedi:", error);
+    });
   } catch (error) {
     console.error("❌ BOT BAŞLATILAMADI:", error);
     process.exit(1);
