@@ -1362,7 +1362,22 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       await interaction.deferReply();
-      const query = interaction.options.getString("şarkı");
+      let query = interaction.options.getString("şarkı");
+
+      // YouTube Music linklerini normal YouTube linkine çevir.
+      // Örn: https://music.youtube.com/watch?v=ABC123&list=...
+      //  -> https://www.youtube.com/watch?v=ABC123
+      try {
+        const parsed = new URL(query);
+        if (parsed.hostname === "music.youtube.com") {
+          const videoId = parsed.searchParams.get("v");
+          if (videoId) {
+            query = `https://www.youtube.com/watch?v=${videoId}`;
+          }
+        }
+      } catch {
+        // URL değilse normal arama metni olarak bırak.
+      }
 
       try {
         const result = await musicPlayer.play(voiceChannel, query, {
