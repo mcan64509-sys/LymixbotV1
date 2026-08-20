@@ -1,6 +1,6 @@
 {
   "name": "nemesis-discord-bot",
-  "version": "4.1.8",
+  "version": "4.1.9",
   "description": "Nemesis Discord Set, Log, Boss, Fun & Music Bot",
   "main": "index.js",
   "scripts": {
@@ -14,12 +14,11 @@
     "pg": "8.13.1",
     "discord-player": "^7.2.0",
     "@discord-player/extractor": "^7.1.0",
-    "@discordjs/voice": "0.19.2",
+    "@discordjs/voice": "^0.18.0",
     "ffmpeg-static": "^5.2.0",
     "discord-api-types": "0.38.52",
     "youtube-dl-exec": "^3.1.7",
     "@snazzah/davey": "^0.1.11",
-    "discord-player-youtubedlp": "^1.0.0",
-    "@discordjs/opus": "0.10.0"
+    "discord-player-youtubedlp": "^1.0.0"
   }
 }
