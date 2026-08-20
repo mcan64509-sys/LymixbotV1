@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install --omit=dev
+RUN rm -f package-lock.json && npm install --omit=dev
 
 COPY . .
 
