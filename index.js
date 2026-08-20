@@ -2882,27 +2882,22 @@ async function start() {
 
     await musicPlayer.extractors.loadMulti(DefaultExtractors);
 
-    // discord-player-youtubei 3.x beta sürümlerinde CommonJS export şekli
-    // sürüme göre değişebiliyor. Class'ı güvenli şekilde çöz.
-    const YoutubeiExtractor =
-      youtubeiModule.YoutubeiExtractor ||
-      youtubeiModule.default?.YoutubeiExtractor ||
-      youtubeiModule.default ||
-      youtubeiModule;
+    // 3.x beta paketi "YouTubeExtractor" export ediyor.
+    const YouTubeExtractor = youtubeiModule.YouTubeExtractor;
 
     if (
-      typeof YoutubeiExtractor !== "function" ||
-      !YoutubeiExtractor.identifier
+      typeof YouTubeExtractor !== "function" ||
+      !YouTubeExtractor.identifier
     ) {
       throw new Error(
-        "YoutubeiExtractor çözülemedi. Paket exportları: " +
+        "YouTubeExtractor çözülemedi. Paket exportları: " +
           Object.keys(youtubeiModule).join(", ")
       );
     }
 
-    await musicPlayer.extractors.register(YoutubeiExtractor, {});
+    await musicPlayer.extractors.register(YouTubeExtractor, {});
     console.log(
-      `▶️ YouTube extractor hazır: ${YoutubeiExtractor.identifier}`
+      `▶️ YouTube extractor hazır: ${YouTubeExtractor.identifier}`
     );
     console.log("🎵 Müzik kaynakları hazır.");
 
