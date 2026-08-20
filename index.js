@@ -9,6 +9,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  AttachmentBuilder,
 } = require("discord.js");
 
 const { Pool } = require("pg");
@@ -1227,8 +1228,24 @@ async function getRandomAtaturkImage() {
   const selected = pages[Math.floor(Math.random() * pages.length)];
   const info = selected.imageinfo[0];
 
+  const imageUrl = info.thumburl || info.url;
+
+  const imageResponse = await fetch(imageUrl, {
+    headers: {
+      "User-Agent": "NemesisBot/1.0 (Discord Bot)",
+    },
+  });
+
+  if (!imageResponse.ok) {
+    throw new Error(`Atatürk görseli indirilemedi: HTTP ${imageResponse.status}`);
+  }
+
+  const arrayBuffer = await imageResponse.arrayBuffer();
+  const imageBuffer = Buffer.from(arrayBuffer);
+
   return {
-    imageUrl: info.thumburl || info.url,
+    imageUrl,
+    imageBuffer,
     sourceUrl: info.descriptionurl || null,
   };
 }
@@ -1272,12 +1289,16 @@ client.on("interactionCreate", async (interaction) => {
         const photo = await getRandomAtaturkImage();
         const quote = ATATURK_QUOTES[Math.floor(Math.random() * ATATURK_QUOTES.length)];
 
+        const attachment = new AttachmentBuilder(photo.imageBuffer, {
+          name: "ataturk.jpg",
+        });
+
         const embed = withFooter(
           new EmbedBuilder()
             .setColor(0xe30a17)
             .setTitle("🇹🇷 MUSTAFA KEMAL ATATÜRK")
             .setDescription(`💬 **“${quote}”**`)
-            .setImage(photo.imageUrl)
+            .setImage("attachment://ataturk.jpg")
         );
 
         if (photo.sourceUrl) {
@@ -1287,7 +1308,10 @@ client.on("interactionCreate", async (interaction) => {
           });
         }
 
-        return interaction.editReply({ embeds: [embed] });
+        return interaction.editReply({
+          embeds: [embed],
+          files: [attachment],
+        });
       } catch (error) {
         console.error("❌ /atatürk:", error);
         const quote = ATATURK_QUOTES[Math.floor(Math.random() * ATATURK_QUOTES.length)];
