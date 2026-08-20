@@ -14,6 +14,7 @@ const {
 
 const { Pool } = require("pg");
 const { spawn } = require("node:child_process");
+const fs = require("node:fs");
 const { Player } = require("discord-player");
 const { DefaultExtractors } = require("@discord-player/extractor");
 const {
@@ -1206,15 +1207,44 @@ function formatBossCountdown(totalSeconds) {
   return `${secs} saniye`;
 }
 
+const YOUTUBE_COOKIE_FILE = "/tmp/nemesis-youtube-cookies.txt";
+
+function prepareYouTubeCookies() {
+  const raw = process.env.YOUTUBE_COOKIES;
+
+  if (!raw || !raw.trim()) {
+    console.warn("⚠️ YOUTUBE_COOKIES Railway variable bulunamadı.");
+    return null;
+  }
+
+  try {
+    // Railway multiline variable değerini Netscape cookies.txt olarak yaz.
+    const normalized = raw.replace(/\r\n/g, "\n").trim() + "\n";
+    fs.writeFileSync(YOUTUBE_COOKIE_FILE, normalized, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+
+    console.log("🍪 YouTube cookies hazır.");
+    return YOUTUBE_COOKIE_FILE;
+  } catch (error) {
+    console.error("❌ YouTube cookies hazırlanamadı:", error?.message || error);
+    return null;
+  }
+}
+
 // ======================================================
 // YOUTUBE DOĞRUDAN SES AKIŞI
 // ======================================================
 
 function createYtDlpAudioStream(url) {
+  const cookieFile = prepareYouTubeCookies();
+
   const args = [
     "--no-playlist",
     "--no-warnings",
     "--quiet",
+    ...(cookieFile ? ["--cookies", cookieFile] : []),
     "-f",
     "bestaudio/best",
     "-o",
@@ -2977,6 +3007,7 @@ client.once("ready", () => {
 async function start() {
   try {
     console.log("🚀 Nemesis Bot başlatılıyor...");
+  console.log(`🍪 YOUTUBE_COOKIES: ${process.env.YOUTUBE_COOKIES ? "AYARLI" : "YOK"}`);
 
     await pool.query("SELECT NOW()");
     console.log("✅ PostgreSQL bağlantısı başarılı.");
