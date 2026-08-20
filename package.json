@@ -1,6 +1,6 @@
 {
   "name": "nemesis-discord-bot",
-  "version": "4.1.1",
+  "version": "4.1.2",
   "description": "Nemesis Discord Set, Log, Boss, Fun & Music Bot",
   "main": "index.js",
   "scripts": {
