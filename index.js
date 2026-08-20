@@ -2839,18 +2839,11 @@ async function start() {
 
     await createTables();
     await registerCommands();
-    await async function startBot() {
-  try {
+
     await musicPlayer.extractors.loadDefault();
     console.log("🎵 Müzik kaynakları hazır.");
-    await client.login(ENV.TOKEN);
-  } catch (error) {
-    console.error("❌ Bot başlatma hatası:", error);
-    process.exit(1);
-  }
-}
 
-startBot();
+    await client.login(ENV.TOKEN);
   } catch (error) {
     console.error("❌ BOT BAŞLATILAMADI:", error);
     process.exit(1);
