@@ -15,7 +15,7 @@ const {
 const { Pool } = require("pg");
 const { Player } = require("discord-player");
 const { DefaultExtractors } = require("@discord-player/extractor");
-const youtubeiModule = require("discord-player-youtubei");
+const { YouTubeDlpExtractor } = require("discord-player-youtubedlp");
 
 // ======================================================
 // ENV
@@ -2882,20 +2882,12 @@ async function start() {
 
     await musicPlayer.extractors.loadMulti(DefaultExtractors);
 
-    // 3.x beta paketi "YouTubeExtractor" export ediyor.
-    // Bu sürümde extractor class'ı statik "identifier" alanını expose etmeyebiliyor;
-    // discord-player register işleminin class'ı kendisinin işlemesine izin veriyoruz.
-    const YouTubeExtractor = youtubeiModule.YouTubeExtractor;
-
-    if (typeof YouTubeExtractor !== "function") {
-      throw new Error(
-        "YouTubeExtractor exportu bulunamadı. Paket exportları: " +
-          Object.keys(youtubeiModule).join(", ")
-      );
-    }
-
-    await musicPlayer.extractors.register(YouTubeExtractor, {});
-    console.log("▶️ YouTube extractor register edildi.");
+    await musicPlayer.extractors.register(YouTubeDlpExtractor, {
+      debug: true,
+      searchLimit: 3,
+      ytdlpTimeoutMs: 30000,
+    });
+    console.log("▶️ YouTube yt-dlp extractor hazır.");
     console.log("🎵 Müzik kaynakları hazır.");
 
     await client.login(ENV.TOKEN);
