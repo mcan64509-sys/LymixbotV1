@@ -1,7 +1,7 @@
 {
-  "name": "nemesis-discord-bot",
+  "name": "spartan-discord-bot",
   "version": "4.2.1",
-  "description": "Nemesis Discord Set, Log, Boss, Fun & Music Bot",
+  "description": "Spartan Discord Set, Log, Boss, Fun & Music Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
