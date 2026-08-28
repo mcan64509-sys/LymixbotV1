@@ -73,7 +73,7 @@ if (missingEnv.length) {
 // SABİTLER
 // ======================================================
 
-const BOT_FOOTER = "Nemesis Bot • Created By Lymix";
+const BOT_FOOTER = "Spartan Bot • Created By Lymix";
 const DUPLICATE_WARNING_SECONDS = 20;
 const CONFIRM_TIMEOUT_MS = 30_000;
 
@@ -81,15 +81,10 @@ const BOSS_TIMEZONE = "Europe/Istanbul";
 
 const BOSS_SCHEDULES = {
   general: [
-    "12:12", "13:42", "15:12", "16:42",
-    "18:10", "19:40", "21:10", "22:40",
-    "00:10", "01:40", "03:10", "04:40",
-    "06:10", "07:40", "09:10", "10:40",
-  ],
-  f9: [
-    "12:40", "14:40", "16:40", "18:40",
-    "20:40", "22:40", "00:40", "02:40",
-    "04:40", "06:40", "08:40", "10:40",
+    "00:40", "02:10", "03:40", "05:10",
+    "06:40", "08:10", "09:40", "11:10",
+    "12:40", "14:10", "15:40", "17:10",
+    "18:40", "20:10", "21:40", "23:10",
   ],
 };
 
@@ -916,7 +911,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName("gerisayim")
-    .setDescription("Sıradaki General ve F9 bosslarına kalan süreyi gösterir."),
+    .setDescription("Sıradaki General bossuna kalan süreyi gösterir."),
 
   new SlashCommandBuilder()
     .setName("gecmis")
@@ -956,7 +951,7 @@ client.on("guildMemberAdd", async (member) => {
     const embed = withFooter(
       new EmbedBuilder()
         .setColor(0x57f287)
-        .setTitle("👋 NEMESİS SUNUCUSUNA KATILDI!")
+        .setTitle("👋 SPARTAN SUNUCUSUNA KATILDI!")
         .setDescription(`${member}, hoş geldin! 🖤`)
         .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
     );
@@ -975,7 +970,7 @@ client.on("guildMemberRemove", async (member) => {
     const embed = withFooter(
       new EmbedBuilder()
         .setColor(0xed4245)
-        .setTitle("👋 NEMESİS SUNUCUSUNDAN AYRILDI!")
+        .setTitle("👋 SPARTAN SUNUCUSUNDAN AYRILDI!")
         .setDescription(`**${member.user.username}** aramızdan ayrıldı.`)
         .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
     );
@@ -1010,7 +1005,7 @@ async function buildStatsEmbed(guildId, user) {
   return withFooter(
     new EmbedBuilder()
       .setColor(0x5865f2)
-      .setTitle("📊 NEMESİS SET İSTATİSTİĞİ")
+      .setTitle("📊 SPARTAN SET İSTATİSTİĞİ")
       .setThumbnail(user.displayAvatarURL({ size: 256 }))
       .setDescription(`👤 ${user}`)
       .addFields(
@@ -1207,7 +1202,7 @@ function formatBossCountdown(totalSeconds) {
   return `${secs} saniye`;
 }
 
-const YOUTUBE_COOKIE_FILE = "/tmp/nemesis-youtube-cookies.txt";
+const YOUTUBE_COOKIE_FILE = "/tmp/spartan-youtube-cookies.txt";
 
 function prepareYouTubeCookies() {
   const raw = process.env.YOUTUBE_COOKIES;
@@ -1322,7 +1317,7 @@ async function getRandomAtaturkImage() {
     `https://commons.wikimedia.org/w/api.php?${searchParams.toString()}`,
     {
       headers: {
-        "User-Agent": "NemesisBot/1.0 (Discord Bot)",
+        "User-Agent": "SpartanBot/1.0 (Discord Bot)",
       },
     }
   );
@@ -1345,7 +1340,7 @@ async function getRandomAtaturkImage() {
 
   const imageResponse = await fetch(imageUrl, {
     headers: {
-      "User-Agent": "NemesisBot/1.0 (Discord Bot)",
+      "User-Agent": "SpartanBot/1.0 (Discord Bot)",
     },
   });
 
@@ -1366,7 +1361,7 @@ async function getRandomAtaturkImage() {
 async function getRandomMeme() {
   const response = await fetch("https://meme-api.com/gimme/memes", {
     headers: {
-      "User-Agent": "NemesisBot/1.0 (Discord Bot)",
+      "User-Agent": "SpartanBot/1.0 (Discord Bot)",
     },
   });
 
@@ -1665,7 +1660,7 @@ client.on("interactionCreate", async (interaction) => {
           withFooter(
             new EmbedBuilder()
               .setColor(0x5865f2)
-              .setTitle("📜 NEMESİS MÜZİK KUYRUĞU")
+              .setTitle("📜 SPARTAN MÜZİK KUYRUĞU")
               .setDescription(lines.join("\\n"))
           ),
         ],
@@ -2333,7 +2328,7 @@ client.on("interactionCreate", async (interaction) => {
       const embed = withFooter(
         new EmbedBuilder()
           .setColor(0x5865f2)
-          .setTitle("📊 NEMESİS GÜNCEL DURUM")
+          .setTitle("📊 SPARTAN GÜNCEL DURUM")
           .addFields(
             {
               name: "🛡️ GENERAL",
@@ -2819,28 +2814,18 @@ client.on("interactionCreate", async (interaction) => {
       await interaction.deferReply();
 
       const general = getNextBossCountdown("general");
-      const f9 = getNextBossCountdown("f9");
 
       const embed = withFooter(
         new EmbedBuilder()
           .setColor(0x5865f2)
-          .setTitle("⏳ NEMESİS BOSS GERİ SAYIM")
-          .addFields(
-            {
-              name: "🛡️ GENERAL",
-              value:
-                `⏰ Sıradaki Boss: **${general.bossTime}**\n` +
-                `⌛ Kalan: **${formatBossCountdown(general.seconds)}**`,
-              inline: false,
-            },
-            {
-              name: "🕷️ F9",
-              value:
-                `⏰ Sıradaki Boss: **${f9.bossTime}**\n` +
-                `⌛ Kalan: **${formatBossCountdown(f9.seconds)}**`,
-              inline: false,
-            }
-          )
+          .setTitle("⏳ SPARTAN BOSS GERİ SAYIM")
+          .addFields({
+            name: "🛡️ GENERAL",
+            value:
+              `⏰ Sıradaki Boss: **${general.bossTime}**\n` +
+              `⌛ Kalan: **${formatBossCountdown(general.seconds)}**`,
+            inline: false,
+          })
       );
 
       return interaction.editReply({ embeds: [embed] });
@@ -3004,7 +2989,7 @@ client.on("interactionCreate", async (interaction) => {
 
 client.once("ready", () => {
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  console.log(`🤖 Nemesis Bot aktif: ${client.user.tag}`);
+  console.log(`🤖 Spartan Bot aktif: ${client.user.tag}`);
   console.log("🐘 PostgreSQL: ONLINE");
   console.log("🚂 Railway: ONLINE");
   console.log("⏰ Boss bildirim sistemi: ONLINE (Europe/Istanbul)");
@@ -3016,7 +3001,7 @@ client.once("ready", () => {
 
 async function start() {
   try {
-    console.log("🚀 Nemesis Bot başlatılıyor...");
+    console.log("🚀 Spartan Bot başlatılıyor...");
   console.log(`🍪 YOUTUBE_COOKIES: ${process.env.YOUTUBE_COOKIES ? "AYARLI" : "YOK"}`);
 
     await pool.query("SELECT NOW()");
