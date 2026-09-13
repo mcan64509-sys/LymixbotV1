@@ -50,7 +50,6 @@ const ENV = {
 const REQUIRED_ENV = [
   "TOKEN",
   "CLIENT_ID",
-  "GUILD_ID",
   "DATABASE_URL",
   "GENERAL_VOICE_CHANNEL_ID",
   "GENERAL_LOG_CHANNEL_ID",
@@ -59,7 +58,6 @@ const REQUIRED_ENV = [
   "F9_VOICE_CHANNEL_ID",
   "F9_LOG_CHANNEL_ID",
   "WELCOME_LOG_CHANNEL_ID",
-  "BOSS_BILDIRIM_CHANNEL_ID",
 ];
 
 const missingEnv = REQUIRED_ENV.filter((key) => !ENV[key]);
@@ -81,11 +79,50 @@ const BOSS_TIMEZONE = "Europe/Istanbul";
 
 const BOSS_SCHEDULES = {
   general: [
-    "00:40", "02:10", "03:40", "05:10",
-    "06:40", "08:10", "09:40", "11:10",
-    "12:40", "14:10", "15:40", "17:10",
-    "18:40", "20:10", "21:40", "23:10",
+    "00:41", "02:11", "03:41", "05:11",
+    "06:41", "08:11", "09:41", "11:11",
+    "12:41", "14:11", "15:41", "17:11",
+    "18:41", "20:11", "21:41", "23:11",
   ],
+  f9: [
+    "01:11", "03:11", "05:11", "07:11",
+    "09:11", "11:11", "13:11", "15:11",
+    "17:11", "19:11", "21:11", "23:11",
+  ],
+};
+
+const GUILD_CONFIGS = {
+  // Sunucu 1: Sadece General log sistemi + boss bildirimleri
+  "1219365268527124570": {
+    enabledTypes: ["general"],
+    bossNotificationChannelId: "1219365961732460575",
+    channels: {
+      general: {
+        voiceChannelId: "1487959970422067350",
+        logChannelId: "1548499993030172782",
+      },
+    },
+  },
+  // Sunucu 2: Mevcut tam sistem + boss bildirimleri
+  "1425090142057529440": {
+    enabledTypes: ["general", "ejder", "f9"],
+    bossNotificationChannelId: "1475579194695225647",
+    welcomeLogChannelId: ENV.WELCOME_LOG_CHANNEL_ID,
+    channels: {
+      general: {
+        voiceChannelId: ENV.GENERAL_VOICE_CHANNEL_ID,
+        logChannelId: ENV.GENERAL_LOG_CHANNEL_ID,
+      },
+      ejder: {
+        voiceChannelId: ENV.EJDER_VOICE_CHANNEL_ID,
+        logChannelId: ENV.EJDER_LOG_CHANNEL_ID,
+      },
+      f9: {
+        voiceChannelId: ENV.F9_VOICE_CHANNEL_ID,
+        logChannelId: ENV.F9_LOG_CHANNEL_ID,
+      },
+    },
+  },
 };
 
 const TYPES = {
@@ -244,11 +281,15 @@ async function fetchChannel(guild, channelId) {
 }
 
 async function getVoiceChannel(guild, type) {
-  return fetchChannel(guild, TYPES[type].voiceChannelId);
+  const channelId = GUILD_CONFIGS[guild.id]?.channels?.[type]?.voiceChannelId;
+  if (!channelId) return null;
+  return fetchChannel(guild, channelId);
 }
 
 async function getLogChannel(guild, type) {
-  return fetchChannel(guild, TYPES[type].logChannelId);
+  const channelId = GUILD_CONFIGS[guild.id]?.channels?.[type]?.logChannelId;
+  if (!channelId) return null;
+  return fetchChannel(guild, channelId);
 }
 
 function chunkLines(lines, maxLength = 950) {
@@ -536,67 +577,73 @@ function bossDateForReminder(localDate, bossTime, reminderTime) {
 async function checkBossNotifications() {
   try {
     if (!client.isReady()) return;
-
-    const guild = client.guilds.cache.get(ENV.GUILD_ID);
-    if (!guild) return;
-
-    const channel = await fetchChannel(guild, ENV.BOSS_BILDIRIM_CHANNEL_ID);
-    if (!channel || !channel.isTextBased()) return;
-
     const now = getIstanbulParts();
 
-    for (const [type, bossTimes] of Object.entries(BOSS_SCHEDULES)) {
-      const config = TYPES[type];
-      if (!config) continue;
+    for (const [guildId, guildConfig] of Object.entries(GUILD_CONFIGS)) {
+      const guild = client.guilds.cache.get(guildId);
+      if (!guild) continue;
 
-      for (const bossTime of bossTimes) {
-        const reminderTime = subtractMinutesFromHHMM(bossTime, 10);
-        if (now.time !== reminderTime) continue;
+      const channel = await fetchChannel(
+        guild,
+        guildConfig.bossNotificationChannelId
+      );
+      if (!channel || !channel.isTextBased()) continue;
 
-        const bossDate = bossDateForReminder(now.date, bossTime, reminderTime);
+      for (const [type, bossTimes] of Object.entries(BOSS_SCHEDULES)) {
+        const config = TYPES[type];
+        if (!config) continue;
 
-        const inserted = await pool.query(
-          `
-            INSERT INTO boss_notifications (guild_id, boss_type, boss_date, boss_time)
-            VALUES ($1, $2, $3, $4)
-            ON CONFLICT (guild_id, boss_type, boss_date, boss_time)
-            DO NOTHING
-            RETURNING id
-          `,
-          [guild.id, type, bossDate, bossTime]
-        );
+        for (const bossTime of bossTimes) {
+          const reminderTime = subtractMinutesFromHHMM(bossTime, 10);
+          if (now.time !== reminderTime) continue;
 
-        if (!inserted.rows.length) continue;
+          const bossDate = bossDateForReminder(now.date, bossTime, reminderTime);
 
-        const embed = withFooter(
-          new EmbedBuilder()
-            .setColor(config.color)
-            .setTitle(`${config.emoji} ${config.name} BOSS BİLDİRİMİ`)
-            .setDescription(
-              [
-                `⏰ **${config.name} bossuna 10 dakika kaldı!**`,
-                `🕒 **Boss Saati:** ${bossTime}`,
-              ].join("\\n")
-            )
-        );
-
-        try {
-          await channel.send({
-            content: "@everyone **Kalkın La Yatıklar** 😂",
-            embeds: [embed],
-            allowedMentions: { parse: ["everyone"] },
-          });
-
-          console.log(`✅ Boss bildirimi: ${config.name} ${bossDate} ${bossTime}`);
-        } catch (sendError) {
-          await pool.query(
+          const inserted = await pool.query(
             `
-              DELETE FROM boss_notifications
-              WHERE guild_id = $1 AND boss_type = $2 AND boss_date = $3 AND boss_time = $4
+              INSERT INTO boss_notifications (guild_id, boss_type, boss_date, boss_time)
+              VALUES ($1, $2, $3, $4)
+              ON CONFLICT (guild_id, boss_type, boss_date, boss_time)
+              DO NOTHING
+              RETURNING id
             `,
             [guild.id, type, bossDate, bossTime]
           );
-          throw sendError;
+
+          if (!inserted.rows.length) continue;
+
+          const embed = withFooter(
+            new EmbedBuilder()
+              .setColor(config.color)
+              .setTitle(`${config.emoji} ${config.name} BOSS BİLDİRİMİ`)
+              .setDescription(
+                [
+                  `⏰ **${config.name} bossuna 10 dakika kaldı!**`,
+                  `🕒 **Boss Saati:** ${bossTime}`,
+                ].join("\\n")
+              )
+          );
+
+          try {
+            await channel.send({
+              content: "@everyone **Kalkın La Yatıklar** 😂",
+              embeds: [embed],
+              allowedMentions: { parse: ["everyone"] },
+            });
+
+            console.log(
+              `✅ Boss bildirimi: ${guild.name} • ${config.name} ${bossDate} ${bossTime}`
+            );
+          } catch (sendError) {
+            await pool.query(
+              `
+                DELETE FROM boss_notifications
+                WHERE guild_id = $1 AND boss_type = $2 AND boss_date = $3 AND boss_time = $4
+              `,
+              [guild.id, type, bossDate, bossTime]
+            );
+            console.error(`❌ Boss bildirimi gönderilemedi (${guild.id}):`, sendError);
+          }
         }
       }
     }
@@ -931,12 +978,14 @@ const commands = [
 async function registerCommands() {
   const rest = new REST({ version: "10" }).setToken(ENV.TOKEN);
 
-  await rest.put(
-    Routes.applicationGuildCommands(ENV.CLIENT_ID, ENV.GUILD_ID),
-    { body: commands }
-  );
+  for (const guildId of Object.keys(GUILD_CONFIGS)) {
+    await rest.put(
+      Routes.applicationGuildCommands(ENV.CLIENT_ID, guildId),
+      { body: commands }
+    );
+  }
 
-  console.log("✅ Slash komutları Discord'a yüklendi.");
+  console.log("✅ Slash komutları iki Discord sunucusuna yüklendi.");
 }
 
 // ======================================================
@@ -945,7 +994,9 @@ async function registerCommands() {
 
 client.on("guildMemberAdd", async (member) => {
   try {
-    const channel = await fetchChannel(member.guild, ENV.WELCOME_LOG_CHANNEL_ID);
+    const channelId = GUILD_CONFIGS[member.guild.id]?.welcomeLogChannelId;
+    if (!channelId) return;
+    const channel = await fetchChannel(member.guild, channelId);
     if (!channel || !channel.isTextBased()) return;
 
     const embed = withFooter(
@@ -964,7 +1015,9 @@ client.on("guildMemberAdd", async (member) => {
 
 client.on("guildMemberRemove", async (member) => {
   try {
-    const channel = await fetchChannel(member.guild, ENV.WELCOME_LOG_CHANNEL_ID);
+    const channelId = GUILD_CONFIGS[member.guild.id]?.welcomeLogChannelId;
+    if (!channelId) return;
+    const channel = await fetchChannel(member.guild, channelId);
     if (!channel || !channel.isTextBased()) return;
 
     const embed = withFooter(
@@ -1709,6 +1762,19 @@ client.on("interactionCreate", async (interaction) => {
       if (!config) {
         return interaction.reply({
           embeds: [feedbackEmbed("❌ GEÇERSİZ TÜR", "Geçerli bir log türü seç.")],
+          ephemeral: true,
+        });
+      }
+
+      const enabledTypes = GUILD_CONFIGS[interaction.guild.id]?.enabledTypes || [];
+      if (!enabledTypes.includes(type)) {
+        return interaction.reply({
+          embeds: [
+            feedbackEmbed(
+              "❌ BU SUNUCUDA KAPALI",
+              "Bu sunucuda yalnızca General log sistemi kullanılabilir."
+            ),
+          ],
           ephemeral: true,
         });
       }
